@@ -70,24 +70,27 @@ function Question:path()
     local lang = utils.get_lang(self.lang)
     local alt = lang.alt and ("." .. lang.alt) or ""
 
-    -- handle legacy file names first
-    local fn_legacy = --
-        ("%s.%s-%s.%s"):format(self.q.frontend_id, self.q.title_slug, lang.slug, lang.ft)
-    self.file = config.storage.home:joinpath(fn_legacy)
+    local file_name = ("%s.%s%s"):format(self.q.frontend_id, self.q.title_slug, alt)
 
-    if self.file:exists() then
-        return self.file:absolute(), true
+    local paths = {
+        ("%s.%s-%s.%s"):format(self.q.frontend_id, self.q.title_slug, lang.slug, lang.ft),
+        ("%s.%s"):format(file_name, lang.ft),
+        ("%s/%s.%s"):format(file_name, file_name, lang.ft),
+    }
+
+    for _, path in pairs(paths) do
+        self.file = config.storage.home:joinpath(path)
+        if self.file:exists() then
+            return self.file:absolute(), true
+        end
     end
 
-    local fn = ("%s.%s%s.%s"):format(self.q.frontend_id, self.q.title_slug, alt, lang.ft)
-    self.file = config.storage.home:joinpath(fn)
-    local existed = self.file:exists()
+    --- make a folder to contain the files
+    local folder = self.file:parent()
+    folder:mkdir({ exists_ok = true })
+    self.file:write(self:snippet(), "w")
 
-    if not existed then
-        self.file:write(self:snippet(), "w")
-    end
-
-    return self.file:absolute(), existed
+    return self.file:absolute(), false
 end
 
 function Question:create_buffer()
