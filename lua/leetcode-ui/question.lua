@@ -85,10 +85,9 @@ function Question:path()
         end
     end
 
-    --- make a folder to contain the files
-    local folder = self.file:parent()
-    folder:mkdir({ exists_ok = true })
-    self.file:write(self:snippet(), "w")
+    --- create the containing folder up front so `:w` works without a BufWritePre
+    --- autocmd; the solution file itself is only written on first save.
+    self.file:parent():mkdir({ exists_ok = true })
 
     return self.file:absolute(), false
 end
@@ -135,8 +134,14 @@ end
 
 ---@param existed boolean
 function Question:open_buffer(existed)
+    self._saved = existed
     ui_utils.buf_set_opts(self.bufnr, { buflisted = true })
     ui_utils.win_set_buf(self.winid, self.bufnr, true)
+    if not existed then
+        --- populate buffer with the starter snippet; the file itself is only
+        --- written to disk on the first save (see `Question:autocmds`).
+        self:editor_reset()
+    end
 
     vim.cmd([[match DiagnosticHint /@leet/]])
 
@@ -152,7 +157,6 @@ end
 ---@return string[]?
 function Question:inject_imports()
     local inject = config.user.injector[self.lang] or {}
-
     local imports = inject.imports
     local default_imports = config.imports[self.lang]
 
@@ -305,6 +309,32 @@ function Question:autocmds()
             self:_unmount()
         end,
     })
+
+    self:_register_first_save_autocmd()
+end
+
+--- Register a buffer-scoped `BufWritePost` that fires once on the first save of
+--- a brand-new solution file, marking the start of a new attempt. Safe to call
+--- again after `change_lang` swaps in a new buffer.
+function Question:_register_first_save_autocmd()
+    vim.api.nvim_create_autocmd("BufWritePost", {
+        group = group,
+        buffer = self.bufnr,
+        callback = function()
+            if not self._saved then
+                self._saved = true
+                self:_on_first_save()
+            end
+        end,
+    })
+end
+
+--- Called the first time the user saves a new solution file. Registers the
+--- question in the local attempt cache so it can be browsed / resumed from the
+--- dashboard. The entry is removed once the question receives an Accepted
+--- verdict (see `leetcode-ui.popup.console.result`).
+function Question:_on_first_save()
+    require("leetcode.cache.attempt").add(self.cache.title_slug, self.lang)
 end
 
 function Question:handle_mount()
@@ -440,6 +470,7 @@ Question.change_lang = vim.schedule_wrap(function(self, lang)
 
         vim.api.nvim_set_option_value("buflisted", false, { buf = old_bufnr })
         self:open_buffer(existed)
+        self:_register_first_save_autocmd()
 
         if not loaded then
             utils.exec_hooks("question_enter", self)
@@ -457,6 +488,7 @@ end)
 function Question:init(problem)
     self.cache = problem
     self.lang = config.lang
+    self._saved = false
 end
 
 ---@type fun(question: lc.cache.Question): lc.ui.Question

@@ -30,6 +30,19 @@ function cmd.problems(options)
     picker.question(p, options)
 end
 
+---Browse locally attempted (saved but not yet Accepted) problems and resume one.
+function cmd.attempts()
+    require("leetcode.utils").auth_guard()
+
+    local attempts = require("leetcode.cache.attempt").questions()
+    if vim.tbl_isempty(attempts) then
+        return log.info("No in-progress attempts")
+    end
+
+    local picker = require("leetcode.picker")
+    picker.question(attempts)
+end
+
 ---@param cb? function
 function cmd.cookie_prompt(cb)
     local cookie = require("leetcode.cache.cookie")
@@ -634,6 +647,7 @@ cmd.commands = {
         cmd.problems,
         _args = arguments.list,
     },
+    attempts = { cmd.attempts },
     random = {
         cmd.random_question,
         _args = arguments.random,

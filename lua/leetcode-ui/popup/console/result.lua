@@ -25,6 +25,7 @@ function ResultPopup:handle(item)
         problemlist.change_status(self.console.question.q.title_slug, status)
         if status == "ac" then
             config.stats.update_streak()
+            require("leetcode.cache.attempt").remove(self.console.question.q.title_slug)
         end
     end
 

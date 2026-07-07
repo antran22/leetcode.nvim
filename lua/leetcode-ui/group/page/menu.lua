@@ -24,6 +24,12 @@ local problems = Button("Problems", {
     expandable = true,
 })
 
+local resume = Button("Resume", {
+    icon = "󱎖",
+    sc = "r",
+    on_press = cmd.attempts,
+})
+
 local statistics = Button("Statistics", {
     icon = "󰄪",
     sc = "s",
@@ -55,6 +61,7 @@ local exit = ExitButton()
 
 page:insert(Buttons({
     problems,
+    resume,
     statistics,
     cookie,
     cache,
